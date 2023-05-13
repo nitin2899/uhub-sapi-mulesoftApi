@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:crypto="http://www.mulesoft.org/schema/mule/crypto"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/crypto http://www.mulesoft.org/schema/mule/crypto/current/mule-crypto.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c23364aa-c130-47af-a7e5-7aff7e5fbff6" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<crypto:jce-config name="Crypto_Jce" doc:name="Crypto Jce" doc:id="458490ec-c92c-4974-8567-3b3fb612002a" keystore="C:\MuleCertificate\Allied.jck" type="JCEKS" password="mulesoft" >
+		<crypto:jce-key-infos >
+			<crypto:jce-asymmetric-key-info keyId="mule1234" alias="aeskey" password="mulesoft" />
+			<crypto:jce-symmetric-key-info keyId="mule123" alias="aeskey" password="mulesoft" />
+		</crypto:jce-key-infos>
+	</crypto:jce-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="41d243c4-adcd-4c99-bb79-491cd11bcb44">
+		<http:request-connection host="localhost" port="8081" />
+	</http:request-config>
+	<flow name="jce_crypto_keybased_using_routingFlow" doc:id="a1653f33-7656-4cd6-b743-1fcd3fc5fbb9" >
+		<http:listener doc:name="Listener" doc:id="109dce12-0790-4f72-827d-170bfa676b50" path="/jce1" config-ref="HTTP_Listener_config"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6f31ad31-ac5a-4da1-9b64-7a3fb100b602" message="Request = #[payload]"/>
+		<crypto:jce-encrypt doc:name="Jce encrypt" doc:id="13b2dca8-1e49-4876-96aa-48d07d997e19" algorithm="AES" keyId="mule123" config-ref="Crypto_Jce"/>
+		<logger level="INFO" doc:name="Logger" doc:id="fb80b13b-c038-4a4b-888c-a5640a7c7dea" message="encrypted payload = #[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="28c089cc-58f3-426b-8008-a48ca8229bc7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import dw::Crypto
+import toBase64 from dw::core::Binaries
+
+output application/json
+---
+toBase64(payload)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="ded656e3-5ceb-4a11-b22f-3d36e57885b3" message="base 64 encoded Message = #[payload]"/>
+		<http:request method="GET" doc:name="Request" doc:id="e4447634-c4ed-43d8-b72e-695a1468c72b" config-ref="HTTP_Request_configuration" path="/jce2" sendBodyMode="ALWAYS"/>
+	</flow>
+	<flow name="jce_crypto_keybased_using_routingFlow1" doc:id="4e88a28c-d4ff-4b61-8910-cfa520c64062" >
+		<http:listener doc:name="Listener" doc:id="30fd8f86-daf8-45a6-a93a-385dd6492222" config-ref="HTTP_Listener_config" path="/jce2"/>
+		<ee:transform doc:name="Transform Message" doc:id="d8524a68-6afe-4d97-bd57-5ac94739797a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import fromBase64 from dw::core::Binaries
+output application/octet-stream
+---
+fromBase64(payload)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="97a4a332-ed3a-4574-8064-739932df1a45" message="base 64 decoded Message = #[payload]"/>
+		<crypto:jce-decrypt doc:name="Jce decrypt" doc:id="841a8848-66b6-49ff-baa8-5eea8a84c932" config-ref="Crypto_Jce" algorithm="AES" keyId="mule123"/>
+		<logger level="INFO" doc:name="Logger" doc:id="5c503def-11e1-40c5-9940-5175c0c9f5f4" message="Response = #[payload]"/>
+	</flow>
+</mule>
